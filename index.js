@@ -17,18 +17,16 @@ function SonyBraviaTVAccessory(log, config) {
     this.ipaddress = config["ipaddress"];
     this.macaddress = config["macaddress"];
 
-
     this.service = new Service.Switch(this.name);
 
     this.service
         .getCharacteristic(Characteristic.On)
         .on('get', this.getOn.bind(this))
         .on('set', this.setOn.bind(this));
-
 }
 
 SonyBraviaTVAccessory.prototype.getOn = function(callback) {
-    this.log("Getting whether Sony TV is on...");
+    this.log("Getting TV status...");
 
     var postData = JSON.stringify({
         method: 'getPowerStatus',
@@ -64,7 +62,14 @@ SonyBraviaTVAccessory.prototype.getOn = function(callback) {
 
 SonyBraviaTVAccessory.prototype.setOn = function(value, callback) {
     value = Boolean(value);
-    this.log("Set value to %s", value);
+    switch(value) {
+    case false:
+        this.log('Turning off TV');
+        break;
+    case true:
+        this.log('Turning on TV');
+        break;
+    }
 
     if (value && this.macaddress) {
         wol.wake(this.macaddress, function(error) {
@@ -78,7 +83,6 @@ SonyBraviaTVAccessory.prototype.setOn = function(value, callback) {
             }
         }.bind(this));
     } else {
-
         var postData = JSON.stringify({
             method: 'setPowerStatus',
             params: [{
@@ -95,7 +99,6 @@ SonyBraviaTVAccessory.prototype.setOn = function(value, callback) {
             },
             form: postData
         }, function(err, response, body) {
-
             if (!err && response.statusCode == 200) {
                 callback(); // success
             } else {
