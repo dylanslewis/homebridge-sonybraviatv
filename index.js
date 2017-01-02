@@ -1,5 +1,10 @@
 var request = require("request");
 var wol = require("wake_on_lan");
+const os = require('os');
+var fs = require('fs');
+var time = require('time');
+var deviceName
+var ipAddress
 var Service, Characteristic;
 
 module.exports = function(homebridge) {
@@ -9,6 +14,7 @@ module.exports = function(homebridge) {
     homebridge.registerAccessory("homebridge-sonybraviatv", "SonyBraviaTV", SonyBraviaTVAccessory);
 }
 
+
 function SonyBraviaTVAccessory(log, config) {
     this.log = log;
 
@@ -17,12 +23,28 @@ function SonyBraviaTVAccessory(log, config) {
     this.ipaddress = config["ipaddress"];
     this.macaddress = config["macaddress"];
 
+    deviceName = this.name
+    ipAddress = this.ipaddress
+
     this.service = new Service.Switch(this.name);
 
     this.service
         .getCharacteristic(Characteristic.On)
         .on('get', this.getOn.bind(this))
         .on('set', this.setOn.bind(this));
+}
+
+function logCharacteristicUpdate(characteristicName, value) {
+    const date = time.time();
+
+    const output = `date=${date}, name=${deviceName}, ip=${ipAddress} characteristic=${characteristicName}, value=${value}\n`;
+    const path = `${os.homedir()}/.homebridge/logs/sonybraviatv.log`;
+
+    fs.appendFile(path, output, function (err) {
+        if(err) {
+            return console.log(err);
+        }
+    });
 }
 
 SonyBraviaTVAccessory.prototype.getOn = function(callback) {
@@ -70,6 +92,8 @@ SonyBraviaTVAccessory.prototype.setOn = function(value, callback) {
         this.log('Turning on TV');
         break;
     }
+
+    logCharacteristicUpdate('Power', value)
 
     if (value && this.macaddress) {
         wol.wake(this.macaddress, function(error) {
