@@ -7,7 +7,9 @@ var deviceName
 var ipAddress
 var Service, Characteristic;
 
-const logFilePath = `${os.homedir()}/.homebridge/logs/sonybraviatv.log`;
+var now = new Date();
+var date = `${now.getDate()}-${now.getMonth()}-${now.getYear()}`;
+var path = `${os.homedir()}/.homebridge/logs/${date}sonybraviatv.log`;
 
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
@@ -36,11 +38,10 @@ function SonyBraviaTVAccessory(log, config) {
 }
 
 function logPowerUpdate(value) {
-    const date = time.time();
     const characteristicName = 'Power';
+    const time = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}:${now.getMilliseconds()}`;
 
-    const path = logFilePath;
-    const output = `date=${date}, name=${deviceName}, ip=${ipAddress} characteristic=${characteristicName}, value=${value}\n`;
+    const output = `time=${time}, name=${deviceName}, ip=${ipAddress} characteristic=${characteristicName}, value=${value}\n`;
 
     fs.exists(path, function(exists) {
       if (exists) {
@@ -61,8 +62,6 @@ function logPowerUpdate(value) {
 
 /* Logs a Power update if the `value` differs from the last known value. */
 function logPowerUpdateIfNecessary(value) {
-    const path = logFilePath;
-
     fs.exists(path, function(exists) {
       if (exists) {
         fs.readFile(path, 'utf8', function(err, contents) {
