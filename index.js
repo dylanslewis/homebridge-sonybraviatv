@@ -7,13 +7,14 @@ var deviceName
 var ipAddress
 var Service, Characteristic;
 
+const logFilePath = `${os.homedir()}/.homebridge/logs/sonybraviatv.log`;
+
 module.exports = function(homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
 
     homebridge.registerAccessory("homebridge-sonybraviatv", "SonyBraviaTV", SonyBraviaTVAccessory);
 }
-
 
 function SonyBraviaTVAccessory(log, config) {
     this.log = log;
@@ -34,17 +35,65 @@ function SonyBraviaTVAccessory(log, config) {
         .on('set', this.setOn.bind(this));
 }
 
-function logCharacteristicUpdate(characteristicName, value) {
+function logPowerUpdate(value) {
     const date = time.time();
+    const characteristicName = 'Power';
 
+    const path = logFilePath;
     const output = `date=${date}, name=${deviceName}, ip=${ipAddress} characteristic=${characteristicName}, value=${value}\n`;
-    const path = `${os.homedir()}/.homebridge/logs/sonybraviatv.log`;
 
-    fs.appendFile(path, output, function (err) {
-        if(err) {
-            return console.log(err);
-        }
+    fs.exists(path, function(exists) {
+      if (exists) {
+        fs.appendFile(path, output, function (err) {
+            if (err) {
+                return console.log(err);
+            }
+        });
+      } else {
+          fs.writeFile(path, output, function (err) {
+              if (err) {
+                  return console.log(err);
+              }
+          });
+      }
     });
+}
+
+/* Logs a Power update if the `value` differs from the last known value. */
+function logPowerUpdateIfNecessary(value) {
+    const path = logFilePath;
+
+    fs.exists(path, function(exists) {
+      if (exists) {
+        fs.readFile(path, 'utf8', function(err, contents) {
+            if(err) {
+                return console.log(err);
+            }
+
+            const logEntries = contents.split("\n");
+            const lastPowerLogEntry = String(logEntries.reverse().find(isLogEntryForPower));
+
+            if (typeof lastPowerLogEntry !== 'undefined') {
+                const lastPowerLogEntrySplitOnValue = contents.split("value=");
+                const lastPowerLogEntryValue = Boolean(lastPowerLogEntrySplitOnValue.reverse()[0]);
+
+                if (lastPowerLogEntryValue !== Boolean(value)) {
+                    logPowerUpdate(value);
+                }
+            } else {
+                // First power entry, update log.
+                logPowerUpdate(value);
+            }
+        });
+      } else {
+        // First entry, update log.
+        logPowerUpdate(value);
+      }
+    });
+}
+
+function isLogEntryForPower(value) {
+  return value.indexOf('characteristic=Power') > -1;
 }
 
 SonyBraviaTVAccessory.prototype.getOn = function(callback) {
@@ -70,6 +119,7 @@ SonyBraviaTVAccessory.prototype.getOn = function(callback) {
             var status = json.result[0].status;
             this.log("TV status is %s", status);
             var isOn = status == "active";
+            logPowerUpdateIfNecessary(isOn);
             callback(null, isOn); // success
         } else {
             if (response != null) {
@@ -93,13 +143,13 @@ SonyBraviaTVAccessory.prototype.setOn = function(value, callback) {
         break;
     }
 
-    logCharacteristicUpdate('Power', value)
+    logPowerUpdate(value)
 
     if (value && this.macaddress) {
         wol.wake(this.macaddress, function(error) {
             if (error) {
                 // handle error
-                this.log("Error '%s' setting TV power state using WOL.", error);                
+                this.log("Error '%s' setting TV power state using WOL.", error);
                 callback(error);
             } else {
                 // done sending packets
